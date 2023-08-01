@@ -2,10 +2,12 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -89,7 +91,7 @@ func signUpHandler(c echo.Context) error {
 		log.Println(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	
+
 	// ユーザーを登録する
 	_, err = db.Exec("INSERT INTO users (Username, HashedPass) VALUES (?, ?)", req.Username, hashedPass)
 	// 登録に失敗したら500 InternalServerErrorを返す
@@ -99,4 +101,52 @@ func signUpHandler(c echo.Context) error {
 	}
 	// 登録に成功したら201 Createdを返す
 	return c.NoContent(http.StatusCreated)
+}
+
+func signUpHandler(c echo.Context) error {
+
+}
+
+func loginHandler(c echo.Context) error {
+	var req LoginRequestBody
+	c.Bind(&req)
+
+	if req.Password == "" || req.Username == "" {
+		return c.String(http.StatusBadRequest, "Username or Password is empty")
+	}
+	user := User{}
+	err := db.Get(&user, "SELECT * FROM users WHERE username=?", req.Username)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return c.NoContent(http.StatusUnauthorized)
+		} else {
+			log.Println(err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.HashedPass), []byte(req.Password+salt))
+	if err != nil {
+		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			return c.NoContent(http.StatusUnauthorized)
+		} else {
+			return c.NoContent(http.StatusInternalServerError)
+		}
+	}
+
+	sess, err := session.Get("sessions", c)
+	if err != nil {
+		fmt.Println(err)
+		return c.String(http.StatusInternalServerError, "something wrong in getting session")
+	}
+	sess.Values["userName"] = req.Username
+	sess.Save(c.Request(), c.Response())
+
+	return c.NoContent(http.StatusOK)
+}
+
+func getWhoAmIHandler(c echo.Context) error {
+	return c.JSON(http.StatusOK, Me{
+		Username: c.Get("userName").(string),
+	})
 }
