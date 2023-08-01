@@ -25,86 +25,48 @@ type LoginRequestBody struct {
 	Password string `json:"password,omitempty" form:"password"`
 }
 
-func getCityInfoHandler(c echo.Context) error {
-	cityName := c.Param("cityName")
-	fmt.Println(cityName)
-
-	var city City
-	db.Get(&city, "SELECT * FROM city WHERE Name=?", cityName)
-	if !city.Name.Valid {
-		return c.NoContent(http.StatusNotFound)
-	}
-
-	return c.JSON(http.StatusOK, city)
+type User struct {
+	Username   string `json:"username,omitempty"  db:"Username"`
+	HashedPass string `json:"-"  db:"HashedPass"`
 }
 
-func postCityHandler(c echo.Context) error {
-	var city City
-	err := c.Bind(&city)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "bad request body")
-	}
-
-	result, err := db.Exec("INSERT INTO city (Name, CountryCode, District, Population) VALUES (?, ?, ?, ?)", city.Name, city.CountryCode, city.District, city.Population)
-	if err != nil {
-		log.Printf("failed to insert city data: %s\n", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		fmt.Printf("failed to get last insert id: %s\n", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	city.ID = int(id)
-
-	return c.JSON(http.StatusCreated, city)
+type Me struct {
+	Username string `json:"username,omitempty"  db:"username"`
 }
 
 func signUpHandler(c echo.Context) error {
-	// リクエストを受け取り、reqに格納する
-	req := LoginRequestBody{}
+	var req LoginRequestBody
 	c.Bind(&req)
 
-	// バリデーションする(PasswordかUsernameが空文字列の場合は400 BadRequestを返す)
 	if req.Password == "" || req.Username == "" {
 		return c.String(http.StatusBadRequest, "Username or Password is empty")
 	}
-
-	// 登録しようとしているユーザーが既にデータベース内に存在するかチェック
 	var count int
-	err = db.Get(&count, "SELECT COUNT(*) FROM users WHERE Username=?", req.Username)
+
+	err := db.Get(&count, "SELECT COUNT(*) FROM users WHERE Username=?", req.Username)
 	if err != nil {
 		log.Println(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	// 存在したら409 Conflictを返す
+
 	if count > 0 {
 		return c.String(http.StatusConflict, "Username is already used")
 	}
 
-	// パスワードをハッシュ化する
 	pw := req.Password + salt
+
 	hashedPass, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
-	// ハッシュ化に失敗したら500 InternalServerErrorを返す
 	if err != nil {
 		log.Println(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	// ユーザーを登録する
 	_, err = db.Exec("INSERT INTO users (Username, HashedPass) VALUES (?, ?)", req.Username, hashedPass)
-	// 登録に失敗したら500 InternalServerErrorを返す
 	if err != nil {
 		log.Println(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	// 登録に成功したら201 Createdを返す
 	return c.NoContent(http.StatusCreated)
-}
-
-func signUpHandler(c echo.Context) error {
-
 }
 
 func loginHandler(c echo.Context) error {
@@ -143,6 +105,42 @@ func loginHandler(c echo.Context) error {
 	sess.Save(c.Request(), c.Response())
 
 	return c.NoContent(http.StatusOK)
+
+}
+
+func getCityInfoHandler(c echo.Context) error {
+	cityName := c.Param("cityName")
+
+	var city City
+	db.Get(&city, "SELECT * FROM city WHERE Name=?", cityName)
+	if !city.Name.Valid {
+		return c.NoContent(http.StatusNotFound)
+	}
+
+	return c.JSON(http.StatusOK, city)
+}
+
+func postCityHandler(c echo.Context) error {
+	var city City
+	err := c.Bind(&city)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "bad request body")
+	}
+
+	result, err := db.Exec("INSERT INTO city (Name, CountryCode, District, Population) VALUES (?, ?, ?, ?)", city.Name, city.CountryCode, city.District, city.Population)
+	if err != nil {
+		log.Printf("failed to insert city data: %s\n", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		fmt.Printf("failed to get last insert id: %s\n", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	city.ID = int(id)
+
+	return c.JSON(http.StatusCreated, city)
 }
 
 func getWhoAmIHandler(c echo.Context) error {

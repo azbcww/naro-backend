@@ -8,18 +8,16 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
-	"github.com/srinathgs/mysqlstore"
-
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo-contrib/session"
-	"github.com/labstack/echo/middleware"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	"github.com/srinathgs/mysqlstore"
 )
 
 var (
 	db   *sqlx.DB
-	salt = os.Getenv("HASH_SALT")
+	salt = ""
 )
 
 func main() {
@@ -39,6 +37,8 @@ func main() {
 		Loc:       jst,
 	}
 
+	salt = os.Getenv("HASH_SALT")
+
 	_db, err := sqlx.Open("mysql", conf.FormatDSN())
 
 	if err != nil {
@@ -53,10 +53,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	store, err := mysqlstore.NewMySQLStoreFromConnection(db.DB, "sessions", "/", 60*60*24*14, []byte("secret-token"))
 
 	if err != nil {
@@ -66,15 +62,17 @@ func main() {
 	e := echo.New()
 	e.Use(middleware.Logger())
 	e.Use(session.Middleware(store))
+
 	e.POST("/login", loginHandler)
 	e.POST("/signup", signUpHandler)
-	e.POST("/signup", signUpHandler)
+
 	withAuth := e.Group("")
 	withAuth.Use(userAuthMiddleware)
 	withAuth.GET("/cities/:cityName", getCityInfoHandler)
 	withAuth.POST("/cities", postCityHandler)
+	withAuth.GET("/whoami", getWhoAmIHandler)
 
-	e.Logger.Fatal(e.Start(":8080"))
+	e.Start(":8080")
 }
 
 func userAuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
