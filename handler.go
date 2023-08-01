@@ -20,6 +20,24 @@ type City struct {
 	Population  sql.NullInt64  `json:"population,omitempty"  db:"Population"`
 }
 
+type Country struct {
+	Code           sql.NullString  `json:"code,omitempty"  db:"Code"`
+	Name           sql.NullString  `json:"name,omitempty"  db:"NAME"`
+	Continent      sql.NullString  `json:"continent,omitempty"  db:"Continent"`
+	Region         sql.NullString  `json:"region,omitempty"  db:"Region"`
+	SurfaceArea    sql.NullFloat64 `json:"surfaceArea,omitempty"  db:"SurfaceArea"`
+	IndepYear      sql.NullInt64   `json:"indepYear,omitempty"  db:"IndepYear"`
+	Population     sql.NullInt64   `json:"Population,omitempty"  db:"Population"`
+	LifeExpectancy sql.NullFloat64 `json:"lifeExpectancy,omitempty"  db:"LifeExpectancy"`
+	GNP            sql.NullFloat64 `json:"gnp,omitempty"  db:"GNP"`
+	GNPOld         sql.NullFloat64 `json:"gnpOld,omitempty"  db:"GNPOld"`
+	LocalName      sql.NullString  `json:"localName,omitempty"  db:"LocalName"`
+	GovernmentForm sql.NullString  `json:"governmentForm,omitempty"  db:"GovernmentForm"`
+	HeadOfState    sql.NullString  `json:"headOfState,omitempty"  db:"HeadOfState"`
+	Capital        sql.NullInt64   `json:"Capital,omitempty"  db:"Capital"`
+	Code2          sql.NullString  `json:"Code2,omitempty"  db:"Code2"`
+}
+
 type LoginRequestBody struct {
 	Username string `json:"username,omitempty" form:"username"`
 	Password string `json:"password,omitempty" form:"password"`
@@ -147,4 +165,47 @@ func getWhoAmIHandler(c echo.Context) error {
 	return c.JSON(http.StatusOK, Me{
 		Username: c.Get("userName").(string),
 	})
+}
+
+func getAllHandler(c echo.Context) error {
+	rows, err := db.Query("SELECT * FROM country")
+	if err != nil {
+		panic(err.Error())
+	}
+	country := Country{}
+	var result []Country
+	for rows.Next() {
+		error := rows.Scan(&country.Code, &country.Name, &country.Continent,
+			&country.Region, &country.SurfaceArea, &country.IndepYear,
+			&country.Population, &country.LifeExpectancy, &country.GNP, &country.GNPOld,
+			&country.LocalName, &country.GovernmentForm, &country.HeadOfState,
+			&country.Capital, &country.Code2)
+		if error != nil {
+			fmt.Println("scan error")
+		} else {
+			result = append(result, country)
+		}
+	}
+	return c.JSON(http.StatusOK, result)
+}
+
+func getCountryInfoHandler(c echo.Context) error {
+	countryName := c.Param("countryName")
+	rows, err := db.Query("SELECT * FROM city WHERE CountryCode=?", countryName)
+	if err != nil {
+		panic(err.Error())
+	}
+	city := City{}
+	var result []City
+	for rows.Next() {
+		error := rows.Scan(&city.ID, &city.Name, &city.CountryCode,
+			&city.District, &city.Population)
+		if error != nil {
+			fmt.Println("scan error")
+		} else {
+			result = append(result, city)
+		}
+	}
+
+	return c.JSON(http.StatusOK, result)
 }

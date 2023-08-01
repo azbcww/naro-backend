@@ -65,11 +65,14 @@ func main() {
 
 	e.POST("/login", loginHandler)
 	e.POST("/signup", signUpHandler)
+	e.GET("/ping", func (c echo.Context) error { return c.String(http.StatusOK,"pong")})
 
 	withAuth := e.Group("")
 	withAuth.Use(userAuthMiddleware)
 	withAuth.GET("/cities/:cityName", getCityInfoHandler)
+	withAuth.GET("/country/:countryName", getCountryInfoHandler)
 	withAuth.POST("/cities", postCityHandler)
+	withAuth.GET("/all", getAllHandler)
 	withAuth.GET("/whoami", getWhoAmIHandler)
 
 	e.Start(":8080")
