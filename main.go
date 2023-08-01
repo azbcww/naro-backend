@@ -14,6 +14,7 @@ import (
 
 var (
 	db *sqlx.DB
+	salt = os.Getenv("HASH_SALT") 
 )
 
 func main() {
@@ -41,12 +42,19 @@ func main() {
 
 	db = _db
 
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS users (Username VARCHAR(255) PRIMARY KEY, HashedPass VARCHAR(255))") 
+
+	if err != nil { 
+		log.Fatal(err) 
+	} 
+
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	e := echo.New()
-
+	
+	e.POST("/signup", signUpHandler)
 	e.GET("/cities/:cityName", getCityInfoHandler)
 	e.POST("/cities", postCityHandler)
 
